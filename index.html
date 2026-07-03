@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <!-- スマホ最適化のためのビューポート設定 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>トライアスロン</title>
+  <style>
+    :root {
+      --primary-color: #007AFF;
+      --bg-color: #F2F2F7;
+      --card-bg: #FFFFFF;
+      --text-main: #1C1C1E;
+      --text-sub: #8E8E93;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 400px; /* PCで見ても間延びしないように制限 */
+    }
+
+    /* 検索フォームのスタイル */
+    .search-box {
+      background-color: var(--card-bg);
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      margin-bottom: 24px;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="tel"] {
+      flex: 1;
+      padding: 16px;
+      font-size: 20px;
+      border: 1px solid #E5E5EA;
+      border-radius: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="tel"]:focus {
+      border-color: var(--primary-color);
+    }
+
+    button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 0 24px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:active {
+      opacity: 0.7;
+    }
+
+    /* 結果表示エリアのスタイル */
+    .result-card {
+      background-color: var(--card-bg);
+      padding: 32px 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      text-align: center;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .yomigana {
+      font-size: 16px;
+      color: var(--text-sub);
+      margin-bottom: 8px;
+    }
+
+    .kanji {
+      font-size: 32px;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+
+    /* ローディングやエラーの表示用 */
+    .status-text {
+      color: var(--text-sub);
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="search-box">
+      <!-- スマホでテンキーを出すために type="tel" を使用 -->
+      <form id="searchForm" class="input-group">
+        <input type="tel" id="numberInput" placeholder="数字を入力" required autocomplete="off">
+        <button type="submit" id="submitBtn">検索</button>
+      </form>
+    </div>
+
+    <div class="result-card" id="resultArea">
+      <div class="status-text">ここに結果が表示されます</div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 後でGASをデプロイしたら、ここのURLを書き換えてください
+    // ==========================================
+    const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxnP8OeiNU0eiX1NFck1fWPJC5xGs6XbIJqV_yYtkDFD7ooJXvHcAQ2NCv-WjNX8D_c/exec';
+
+    const searchForm = document.getElementById('searchForm');
+    const numberInput = document.getElementById('numberInput');
+    const resultArea = document.getElementById('resultArea');
+    const submitBtn = document.getElementById('submitBtn');
+
+    searchForm.addEventListener('submit', async (e) => {
+      e.preventDefault(); // 画面リロードを防ぐ
+      
+      const number = numberInput.value.trim();
+      if (!number) return;
+
+      // 検索中の表示
+      submitBtn.disabled = true;
+      resultArea.innerHTML = '<div class="status-text">検索中...</div>';
+
+      try {
+        // GASへGETリクエスト（CORSエラーを避けるためGETが推奨されることが多いです）
+        // URLパラメータとして数字を渡します
+        const response = await fetch(`${GAS_ENDPOINT}?number=${number}`);
+        
+        if (!response.ok) {
+          throw new Error('ネットワークエラーが発生しました');
+        }
+
+        const data = await response.json();
+
+        // GASからの返り値が { number: "123", kanji: "山田 太郎", yomigana: "ヤマダ タロウ" } の形を想定
+        if (data && data.kanji) {
+          resultArea.innerHTML = `
+            <div class="yomigana">${data.yomigana}</div>
+            <div class="kanji">${data.kanji}</div>
+          `;
+        } else {
+          resultArea.innerHTML = '<div class="status-text">データが見つかりませんでした</div>';
+        }
+
+      } catch (error) {
+        console.error('Error:', error);
+        resultArea.innerHTML = '<div class="status-text" style="color: red;">エラーが発生しました</div>';
+      } finally {
+        // 連続入力しやすいように設定をリセット
+        submitBtn.disabled = false;
+        numberInput.value = ''; // 入力欄を空にする
+        numberInput.focus();    // キーボードを出しっぱなしにする（機種・ブラウザによっては効かない場合があります）
+      }
+    });
+  </script>
+</body>
+</html>
